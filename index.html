@@ -164,8 +164,8 @@
         .admin-mode:hover {
             background-color: #047857;
         }
-        .export-btn {
-            background-color: #059669;
+        .save-btn {
+            background-color: #3b82f6;
             color: white;
             border: none;
             padding: 15px 30px;
@@ -175,9 +175,42 @@
             font-weight: 600;
             margin-top: 30px;
             width: 100%;
+            margin-bottom: 10px;
+        }
+        .save-btn:hover {
+            background-color: #2563eb;
+        }
+        .export-btn {
+            background-color: #059669;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
         }
         .export-btn:hover {
             background-color: #047857;
+        }
+        .save-status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-weight: 600;
+            display: none;
+        }
+        .save-status.success {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .save-status.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
         }
         .today-btn {
             background-color: #3b82f6;
@@ -377,6 +410,8 @@
             </div>
         </div>
 
+        <button class="save-btn" onclick="saveData()">💾 บันทึกข้อมูล</button>
+        <div id="saveStatus" class="save-status"></div>
         <button class="export-btn" onclick="exportToPDF()">📄 Export เป็น PDF</button>
     </div>
 
@@ -397,6 +432,144 @@
 
         let participantData = {};
         const ADMIN_PASSWORD = 'P@ssw0rd';
+
+        // Data persistence functions
+        function saveData() {
+            try {
+                const formData = {
+                    documentInfo: {
+                        requestDate: document.getElementById('requestDate').value,
+                        dueDate: document.getElementById('dueDate').value,
+                        documentName: document.getElementById('documentName').value,
+                        documentType: document.getElementById('documentType').value,
+                        documentNumber: document.getElementById('documentNumber').value,
+                        version: document.getElementById('version').value,
+                        effectiveDate: document.getElementById('effectiveDate').value,
+                        hardCopy: document.getElementById('hardCopy').checked,
+                        softCopy: document.getElementById('softCopy').checked,
+                        edms: document.getElementById('edms').checked,
+                        other: document.getElementById('other').checked
+                    },
+                    participants: participantData,
+                    timestamp: new Date().toISOString()
+                };
+
+                // Save to localStorage
+                localStorage.setItem('meetingAttendanceData', JSON.stringify(formData));
+                showSaveStatus('success', 'บันทึกข้อมูลสำเร็จ! ✅');
+                
+                // Auto-hide success message after 3 seconds
+                setTimeout(() => {
+                    hideSaveStatus();
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Error saving data:', error);
+                showSaveStatus('error', 'เกิดข้อผิดพลาดในการบันทึกข้อมูล! ❌');
+            }
+        }
+
+        function loadData() {
+            try {
+                const savedData = localStorage.getItem('meetingAttendanceData');
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    
+                    // Load document info
+                    if (data.documentInfo) {
+                        document.getElementById('requestDate').value = data.documentInfo.requestDate || '';
+                        document.getElementById('dueDate').value = data.documentInfo.dueDate || '';
+                        document.getElementById('documentName').value = data.documentInfo.documentName || '';
+                        document.getElementById('documentType').value = data.documentInfo.documentType || 'internal';
+                        document.getElementById('documentNumber').value = data.documentInfo.documentNumber || '';
+                        document.getElementById('version').value = data.documentInfo.version || '';
+                        document.getElementById('effectiveDate').value = data.documentInfo.effectiveDate || '';
+                        document.getElementById('hardCopy').checked = data.documentInfo.hardCopy || false;
+                        document.getElementById('softCopy').checked = data.documentInfo.softCopy || false;
+                        document.getElementById('edms').checked = data.documentInfo.edms || false;
+                        document.getElementById('other').checked = data.documentInfo.other || false;
+                    }
+                    
+                    // Load participant data
+                    if (data.participants) {
+                        participantData = data.participants;
+                        loadParticipantData();
+                    }
+                    
+                    console.log('Data loaded successfully');
+                } else {
+                    // Set default values if no saved data
+                    setDefaultValues();
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                setDefaultValues();
+            }
+        }
+
+        function loadParticipantData() {
+            Object.keys(participantData).forEach(index => {
+                const data = participantData[index];
+                const row = document.querySelector(`#participantsList .participant-row:nth-child(${parseInt(index) + 1})`);
+                
+                if (row && data) {
+                    // Load method selection
+                    if (data.method) {
+                        const methodSelect = row.querySelector('select');
+                        if (methodSelect) methodSelect.value = data.method;
+                    }
+                    
+                    // Load date
+                    if (data.date) {
+                        const dateInput = row.querySelector('input[type="date"]');
+                        if (dateInput) dateInput.value = data.date;
+                    }
+                    
+                    // Load signature
+                    if (data.signature) {
+                        const canvas = document.getElementById(`canvas-${index}`);
+                        if (canvas) {
+                            const ctx = canvas.getContext('2d');
+                            const img = new Image();
+                            img.onload = function() {
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                ctx.drawImage(img, 0, 0);
+                            };
+                            img.src = data.signature;
+                        }
+                    }
+                }
+            });
+        }
+
+        function setDefaultValues() {
+            document.getElementById('documentName').value = 'รายงานการประชุม MU Monthly ประจาเดือนกุมภาพันธ์';
+            document.getElementById('documentNumber').value = 'ALL-SQP-FM-041';
+            document.getElementById('version').value = 'E';
+            document.getElementById('effectiveDate').value = '2022-09-15';
+            document.getElementById('hardCopy').checked = true;
+            document.getElementById('softCopy').checked = true;
+        }
+
+        function showSaveStatus(type, message) {
+            const statusDiv = document.getElementById('saveStatus');
+            statusDiv.className = `save-status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+
+        function hideSaveStatus() {
+            const statusDiv = document.getElementById('saveStatus');
+            statusDiv.style.display = 'none';
+        }
+
+        // Auto-save function
+        function autoSave() {
+            saveData();
+        }
+
+        // Auto-save every 30 seconds
+        setInterval(autoSave, 30000);
 
         function showPasswordModal() {
             if (isAdminMode) {
@@ -562,6 +735,9 @@
                 participantData[index] = {};
             }
             participantData[index][field] = value;
+            
+            // Auto-save when participant data changes
+            setTimeout(autoSave, 1000); // Delay to avoid too frequent saves
         }
 
         function clearSignature(index) {
@@ -655,13 +831,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeParticipants();
             
-            // Set default values
-            document.getElementById('documentName').value = 'รายงานการประชุม MU Monthly ประจาเดือนกุมภาพันธ์';
-            document.getElementById('documentNumber').value = 'ALL-SQP-FM-041';
-            document.getElementById('version').value = 'E';
-            document.getElementById('effectiveDate').value = '2022-09-15';
-            document.getElementById('hardCopy').checked = true;
-            document.getElementById('softCopy').checked = true;
+            // Load saved data first
+            loadData();
             
             // Password modal event listeners
             document.getElementById('adminPassword').addEventListener('keypress', function(e) {
@@ -675,6 +846,16 @@
                 if (e.target === this) {
                     closePasswordModal();
                 }
+            });
+
+            // Add event listeners for auto-save on form changes
+            const formInputs = document.querySelectorAll('#requestDate, #dueDate, #documentName, #documentType, #documentNumber, #version, #effectiveDate, #hardCopy, #softCopy, #edms, #other');
+            formInputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    if (isAdminMode) {
+                        setTimeout(autoSave, 1000);
+                    }
+                });
             });
         });
     </script>
